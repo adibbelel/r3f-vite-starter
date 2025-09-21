@@ -1,8 +1,14 @@
-#root {
-  width: 100vw;
-  height: 100vh;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+  height: 100%;
+  }
+  body {
+    @apply bg-[#e8e1d5] text-white relative font-sans
+    h-screen overflow-x-hidden;
+  }
 }
 
-body {
-  margin: 0;
-}
