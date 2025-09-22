@@ -9,7 +9,7 @@
 }
 
 .collaborative-canvas header {
-  background: linear-gradient(90deg, #0070f3 0%, #0070f3 100%);
+  background: linear-gradient(90deg, #63e99b 0%, #63e99b 100%);
   color: white;
   padding: 20px;
   text-align: center;
@@ -76,7 +76,7 @@
 }
 
 .collaborative-canvas .upload-box {
-  border: 2px dashed #0070f3;
+  border: 2px dashed #63e99b;
   border-radius: 10px;
   padding: 30px;
   text-align: center;
@@ -93,7 +93,7 @@
 
 .collaborative-canvas .upload-icon {
   font-size: 3rem;
-  color: #0070f3;
+  color: #63e99b;
   margin-bottom: 10px;
 }
 
@@ -105,7 +105,7 @@
   display: block;
   margin-bottom: 5px;
   font-weight: bold;
-  color: #0070f3;
+  color: #63e99b;
 }
 
 .collaborative-canvas input[type="range"] {
@@ -122,7 +122,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #0070f3;
+  background: #63e99b;
   cursor: pointer;
 }
 
@@ -130,7 +130,7 @@
   display: inline-block;
   width: 40px;
   text-align: right;
-  color: #0070f3;
+  color: #63e99b;
   font-weight: bold;
 }
 
@@ -146,7 +146,7 @@
 .collaborative-canvas .timer {
   font-size: 1.8rem;
   font-weight: bold;
-  color: #0070f3;
+  color: #63e99b;
   text-shadow: 0 0 10px rgba(0, 112, 243, 0.5);
 }
 
@@ -176,7 +176,7 @@
 .collaborative-canvas .nextjs-badge::before {
   content: "▲";
   font-size: 1.2rem;
-  color: #0070f3;
+  color: #63e99b;
 }
 
 .collaborative-canvas .status-indicator {

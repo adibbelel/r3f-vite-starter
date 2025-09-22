@@ -20,6 +20,7 @@ const CollaborativeCanvas = () => {
   const [size, setSize] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [backendStatus, setBackendStatus] = useState('Connected to backend');
+  const [lastPosition, setLastPosition] = useState({ x: 0, y: 0 });
   
   // Constants
   const CANVAS_WIDTH = 6144;
@@ -60,7 +61,7 @@ const CollaborativeCanvas = () => {
     }
     
     // Draw center marker
-    mainCtx.strokeStyle = '#0070f3';
+    mainCtx.strokeStyle = '#63e99b';
     mainCtx.lineWidth = 3;
     mainCtx.beginPath();
     mainCtx.arc(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, 100, 0, Math.PI * 2);
@@ -68,12 +69,12 @@ const CollaborativeCanvas = () => {
     
     // Add initial content
     mainCtx.font = 'Bold 300px Arial';
-    mainCtx.fillStyle = '#0070f3';
+    mainCtx.fillStyle = '#63e99b';
     mainCtx.textAlign = 'center';
     mainCtx.fillText('Next.js Canvas', CANVAS_WIDTH/2, CANVAS_HEIGHT/2 - 200);
     
     mainCtx.font = '150px Arial';
-    mainCtx.fillStyle = '#0070f3';
+    mainCtx.fillStyle = '#63e99b';
     mainCtx.fillText('Auto-save to Backend', CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 100);
     
     // Set up display canvas
@@ -84,12 +85,11 @@ const CollaborativeCanvas = () => {
     updateCanvasDisplay();
   }, []);
 
-  // Timer effect
   useEffect(() => {
     if (uploadTimer <= 0) return;
-    
+
     const timer = setInterval(() => {
-      setUploadTimer(prev => {
+      setUploadTimer((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
           return 0;
@@ -110,6 +110,47 @@ const CollaborativeCanvas = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Add this state
+  const [ws, setWs] = useState(null);
+
+  // Connect to backend when component mounts
+  useEffect(() => {
+    const socket = new WebSocket(`ws://${window.location.hostname}:3000`);
+    setWs(socket);
+
+    socket.onopen = () => {
+      setBackendStatus("Connected to backend");
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === "init" || data.type === "update") {
+        const img = new Image();
+        img.src = data.canvas;
+        img.onload = () => {
+          const mainCanvas = mainCanvasRef.current;
+          const ctx = mainCanvas.getContext("2d");
+          mainCanvas.width = img.width;
+          mainCanvas.height = img.height;
+          ctx.clearRect(0, 0, img.width, img.height);
+          ctx.drawImage(img, 0, 0);
+
+          updateCanvasDisplay();
+        };
+      }
+    };
+
+    socket.onclose = () => {
+      setBackendStatus("Disconnected");
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, []);
+
+
   // Update canvas display
   const updateCanvasDisplay = () => {
     const displayCanvas = canvasRef.current;
@@ -125,14 +166,14 @@ const CollaborativeCanvas = () => {
     ctx.restore();
     
     // Draw viewport border
-    ctx.strokeStyle = '#0070f3';
+    ctx.strokeStyle = '#00f365ff';
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, displayCanvas.width, displayCanvas.height);
     
     // Draw zoom level indicator
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(10, 10, 140, 40);
-    ctx.fillStyle = '#0070f3';
+    ctx.fillStyle = '#00f365ff';
     ctx.font = '14px Arial';
     ctx.fillText(`Zoom: ${Math.round(scale * 100)}%`, 20, 30);
     ctx.fillText(`Position: ${Math.round(-offset.x/scale)}, ${Math.round(-offset.y/scale)}`, 20, 50);
@@ -200,33 +241,36 @@ const CollaborativeCanvas = () => {
     addImageToCanvas();
   };
 
-  // Add image to canvas
   const addImageToCanvas = () => {
-    if (!currentImageData || !placementPosition) return;
-    
-    const mainCanvas = mainCanvasRef.current;
-    const mainCtx = mainCanvas.getContext('2d');
+    if (!currentImageData || !placementPosition || !ws) return;
+
     const img = currentImageData.img;
-    
     const width = currentImageData.width * (size / 100);
     const height = currentImageData.height * (size / 100);
-    
-    const x = Math.max(0, Math.min(CANVAS_WIDTH - width, placementPosition.x - width/2));
-    const y = Math.max(0, Math.min(CANVAS_HEIGHT - height, placementPosition.y - height/2));
-    
-    mainCtx.save();
-    mainCtx.translate(x + width/2, y + height/2);
-    mainCtx.rotate(rotation * Math.PI / 180);
-    mainCtx.drawImage(img, -width/2, -height/2, width, height);
-    mainCtx.restore();
-    
-    // Update display
+
+    const x = Math.max(0, Math.min(CANVAS_WIDTH - width, placementPosition.x));
+    const y = Math.max(0, Math.min(CANVAS_HEIGHT - height, placementPosition.y));
+
+    ws.send(JSON.stringify({
+      type: "place",
+      image: currentImage,   // base64 string
+      x: x,
+      y: y,
+      scale: size / 100,
+      rotation: rotation
+    }));
+
+    // reset state
+    setCurrentImage(null);
+    setCurrentImageData(null);
+    setIsPlacingMode(false);
+    setPlacementPosition(null);
+    setUploadTimer(PLACEMENT_COOLDOWN);
+
+
     updateCanvasDisplay();
     
-    // Simulate backend save
-    simulateBackendSave();
-    
-    // Reset state
+    // reset state
     setCurrentImage(null);
     setCurrentImageData(null);
     setIsPlacingMode(false);
@@ -234,20 +278,6 @@ const CollaborativeCanvas = () => {
     setUploadTimer(PLACEMENT_COOLDOWN);
   };
 
-  // Simulate backend save
-  const simulateBackendSave = () => {
-    setBackendStatus('Saving to backend...');
-    
-    setTimeout(() => {
-      setBackendStatus('Saved to backend ✓');
-      
-      setTimeout(() => {
-        setBackendStatus('Connected to backend');
-      }, 2000);
-    }, 1000);
-  };
-
-  // Handle zoom
   const handleZoom = (e) => {
     e.preventDefault();
     
@@ -273,29 +303,42 @@ const CollaborativeCanvas = () => {
     updateCanvasDisplay();
   };
 
-  // Handle drag
+  const handleDragStart = (e) => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    setLastPosition({ x: e.clientX, y: e.clientY });
+  };
+
   const handleDrag = (e) => {
     if (!isDragging) return;
     
+    const dx = e.clientX - lastPosition.x;
+    const dy = e.clientY - lastPosition.y;
+    
     setOffset(prev => ({
-      x: prev.x + e.movementX,
-      y: prev.y + e.movementY
+      x: prev.x + dx,
+      y: prev.y + dy
     }));
     
+    setLastPosition({ x: e.clientX, y: e.clientY });
+    
     updateCanvasDisplay();
+  };
+
+  // Handle drag end
+  const handleDragEnd = () => {
+    setIsDragging(false);
   };
 
   return (
     <div className="collaborative-canvas">
       <header>
-        <div className="logo">▲</div>
-        <h1>Next.js Collaborative Canvas</h1>
-        <p className="subtitle">Real-time collaboration with automatic backend synchronization</p>
+        <h2>Add Meme Here</h2>
       </header>
       
       <div className="main-content">
         <div className="upload-section">
-          <h2>Add Your Image</h2>
+          <h3>Add Your Image</h3>
           <div 
             className="upload-box" 
             onClick={() => fileInputRef.current.click()}
@@ -361,10 +404,10 @@ const CollaborativeCanvas = () => {
           <p>Click anywhere on the canvas to place your image. Auto-saves to backend.</p>
           <div 
             className="canvas-container"
-            onMouseDown={() => setIsDragging(true)}
+            onMouseDown={handleDragStart}
             onMouseMove={handleDrag}
-            onMouseUp={() => setIsDragging(false)}
-            onMouseLeave={() => setIsDragging(false)}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
             onWheel={handleZoom}
             onClick={handleCanvasClick}
           >
